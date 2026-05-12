@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
 import io
 import smtplib
 from email.mime.text import MIMEText
@@ -76,7 +76,6 @@ with st.form("form_registro"):
         tarea_seleccionada = st.selectbox("📌 Tarea", tareas)
         estado_seleccionado = st.selectbox("📊 Estado", estados)
     
-    # Subir múltiples fotos
     st.markdown("📸 **Fotos del avance (opcional - puedes subir varias)**")
     fotos_subidas = st.file_uploader("Seleccionar imágenes", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
     
@@ -86,7 +85,6 @@ with st.form("form_registro"):
         if not nombre_trabajador:
             st.error("❌ Por favor, ingrese el nombre del trabajador")
         else:
-            # Guardar fotos
             lista_fotos = []
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             for i, foto in enumerate(fotos_subidas):
@@ -94,12 +92,15 @@ with st.form("form_registro"):
                 st.session_state.fotos_obra[nombre_foto] = foto.getvalue()
                 lista_fotos.append(nombre_foto)
             
+            # Fecha en formato DÍA/MES/AÑO y hora con +2 (España)
+            hora_espana = (datetime.now() + timedelta(hours=2)).strftime("%H:%M:%S")
+            
             nuevo_registro = pd.DataFrame([{
-                "Fecha": fecha.strftime("%Y-%m-%d"),
+                "Fecha": fecha.strftime("%d/%m/%Y"),
                 "Trabajador": nombre_trabajador,
                 "Tarea": tarea_seleccionada,
                 "Estado": estado_seleccionado,
-                "Hora_Registro": datetime.now().strftime("%H:%M:%S"),
+                "Hora_Registro": hora_espana,
                 "Fotos": ", ".join(lista_fotos) if lista_fotos else ""
             }])
             st.session_state.df_registros = pd.concat([st.session_state.df_registros, nuevo_registro], ignore_index=True)
@@ -115,7 +116,6 @@ if not st.session_state.df_registros.empty:
     df_mostrar = df_mostrar.drop(columns=["Fotos"], errors='ignore')
     st.dataframe(df_mostrar, use_container_width=True, height=300)
     
-    # Ver fotos por registro
     st.subheader("📸 Ver fotos guardadas")
     registro_seleccionado = st.selectbox("Selecciona un registro para ver sus fotos", 
                                           st.session_state.df_registros["Tarea"].tolist())
