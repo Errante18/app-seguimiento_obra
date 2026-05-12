@@ -10,23 +10,22 @@ from email import encoders
 import base64
 import os
 
-# Configuración de la página
 st.set_page_config(
     page_title="Seguimiento de Obra",
     page_icon="🏗️",
     layout="centered"
 )
 
-#def get_logo_base64():
-    return "https://i.postimg.cc/66Hm1Vpz/Captura-de-pantalla-2026-05-12-212819.png"
-# Título y logo
+# LOGO DE LA EMPRESA
+logo_url = "https://i.postimg.cc/66Hm1Vpz/Captura-de-pantalla-2026-05-12-212819.png"
+
 col1, col2, col3 = st.columns([1, 2, 1])
 with col2:
-    st.image(get_logo_base64(), width=150)
+    st.image(logo_url, width=150)
+
 st.title("📋 Seguimiento de Obra")
 st.markdown("---")
 
-# Lista de tareas
 tareas = [
     "Trazado y marcado de cajas, tubos y cuadros",
     "Ejecución rozas en paredes y techos",
@@ -47,7 +46,6 @@ tareas = [
     "Pruebas de funcionamiento"
 ]
 
-# Estados de avance
 estados = [
     "🟢 Avance 25%",
     "🟡 Avance 50%",
@@ -57,13 +55,11 @@ estados = [
     "🔧 Finalizado y corregidos los errores"
 ]
 
-# Inicializar DataFrame en session_state
 if 'df_registros' not in st.session_state:
     st.session_state.df_registros = pd.DataFrame(columns=[
         "Fecha", "Trabajador", "Tarea", "Estado", "Hora_Registro"
     ])
 
-# Formulario de entrada
 st.subheader("➕ Nuevo Registro")
 
 with st.form("form_registro"):
@@ -96,13 +92,11 @@ with st.form("form_registro"):
 
 st.markdown("---")
 
-# Mostrar registros existentes
 st.subheader("📊 Registros Actuales")
 
 if not st.session_state.df_registros.empty:
     st.dataframe(st.session_state.df_registros, use_container_width=True, height=300)
     
-    # Estadísticas rápidas
     st.subheader("📈 Resumen de tareas")
     resumen = st.session_state.df_registros.groupby("Estado").size().reset_index(name="Cantidad")
     st.bar_chart(resumen.set_index("Estado"))
@@ -111,7 +105,6 @@ else:
 
 st.markdown("---")
 
-# Función para generar Excel
 def generar_excel():
     if st.session_state.df_registros.empty:
         return None
@@ -120,7 +113,6 @@ def generar_excel():
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         st.session_state.df_registros.to_excel(writer, sheet_name='Seguimiento_Obra', index=False)
         
-        # Ajustar anchos de columna
         worksheet = writer.sheets['Seguimiento_Obra']
         for column in worksheet.columns:
             max_length = 0
@@ -137,7 +129,6 @@ def generar_excel():
     output.seek(0)
     return output
 
-# Botón para descargar Excel
 st.subheader("💾 Exportar Datos")
 
 col1, col2 = st.columns(2)
@@ -153,7 +144,6 @@ with col1:
         st.warning("⚠️ No hay datos para exportar")
 
 with col2:
-    # Botón para limpiar registros
     if st.button("🗑️ Limpiar todos los registros", use_container_width=True):
         st.session_state.df_registros = pd.DataFrame(columns=[
             "Fecha", "Trabajador", "Tarea", "Estado", "Hora_Registro"
@@ -162,17 +152,13 @@ with col2:
 
 st.markdown("---")
 
-# Envío de correo
 st.subheader("📧 Enviar por Correo Electrónico")
 
-# Configuración de correo (para producción, usar st.secrets)
-# En Streamlit Cloud, configurar en .streamlit/secrets.toml
 if 'email_config' not in st.session_state:
-    # Configuración por defecto - CAMBIAR ESTOS VALORES
     st.session_state.email_config = {
-        'destinatario': 'profesora@email.com',  # Cambiar por email de la profesora
-        'remitente': 'tu_email@gmail.com',       # Cambiar por tu email
-        'password': ''                           # Contraseña de aplicación
+        'destinatario': 'profesora@email.com',
+        'remitente': 'tu_email@gmail.com',
+        'password': ''
     }
 
 with st.expander("⚙️ Configurar envío de correo"):
@@ -195,16 +181,13 @@ with st.expander("⚙️ Configurar envío de correo"):
         st.session_state.email_config['password'] = password
         st.success("Configuración guardada temporalmente")
 
-# Función para enviar email
 def enviar_email(destinatario, remitente, password, archivo_excel):
     try:
-        # Crear mensaje
         msg = MIMEMultipart()
         msg['From'] = remitente
         msg['To'] = destinatario
         msg['Subject'] = f"Informe Seguimiento Obra - {datetime.now().strftime('%d/%m/%Y %H:%M')}"
         
-        # Cuerpo del mensaje
         cuerpo = f"""
         Informe de seguimiento de obra generado desde la app.
         
@@ -218,7 +201,6 @@ def enviar_email(destinatario, remitente, password, archivo_excel):
         """
         msg.attach(MIMEText(cuerpo, 'plain', 'utf-8'))
         
-        # Adjuntar archivo
         if archivo_excel:
             part = MIMEBase('application', 'octet-stream')
             part.set_payload(archivo_excel.getvalue())
@@ -229,7 +211,6 @@ def enviar_email(destinatario, remitente, password, archivo_excel):
             )
             msg.attach(part)
         
-        # Enviar correo
         with smtplib.SMTP('smtp.gmail.com', 587) as server:
             server.starttls()
             server.login(remitente, password)
@@ -240,7 +221,6 @@ def enviar_email(destinatario, remitente, password, archivo_excel):
     except Exception as e:
         return False, f"Error al enviar: {str(e)}"
 
-# Botón para enviar correo
 col1, col2 = st.columns([2, 1])
 with col1:
     if st.button("📧 Enviar Excel por correo", use_container_width=True, type="primary"):
@@ -270,7 +250,6 @@ with col2:
     if st.button("🔄 Actualizar", use_container_width=True):
         st.rerun()
 
-# Información de ayuda
 st.markdown("---")
 st.caption("""
 **ℹ️ Nota importante:** 
@@ -279,7 +258,5 @@ st.caption("""
 - Para usar el envío de correo, activa el acceso a apps no seguras o genera una contraseña de aplicación en Gmail
 """)
 
-# Footer
 st.markdown("---")
 st.markdown("🏗️ **App Seguimiento de Obra** | Desarrollado para Fundación Masaveu")
-
