@@ -17,12 +17,8 @@ st.set_page_config(
     layout="centered"
 )
 
-# Logo de la empresa (usando una imagen base64 para que funcione sin archivos externos)
-def get_logo_base64():
-    # Aquí puedes reemplazar con el base64 de tu logo real
-    # Este es un logo de ejemplo (ícono de construcción)
-    return "https://cdn-icons-png.flaticon.com/512/3125/3125713.png"
-
+#def get_logo_base64():
+    return "https://i.postimg.cc/66Hm1Vpz/Captura-de-pantalla-2026-05-12-212819.png"
 # Título y logo
 col1, col2, col3 = st.columns([1, 2, 1])
 with col2:
