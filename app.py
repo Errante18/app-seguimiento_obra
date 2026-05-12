@@ -8,7 +8,7 @@ from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
 from email import encoders
 import base64
-import os
+from PIL import Image
 
 st.set_page_config(
     page_title="Seguimiento de Obra",
@@ -57,8 +57,11 @@ estados = [
 
 if 'df_registros' not in st.session_state:
     st.session_state.df_registros = pd.DataFrame(columns=[
-        "Fecha", "Trabajador", "Tarea", "Estado", "Hora_Registro"
+        "Fecha", "Trabajador", "Tarea", "Estado", "Hora_Registro", "Fotos"
     ])
+
+if 'fotos_obra' not in st.session_state:
+    st.session_state.fotos_obra = {}
 
 st.subheader("➕ Nuevo Registro")
 
@@ -73,21 +76,34 @@ with st.form("form_registro"):
         tarea_seleccionada = st.selectbox("📌 Tarea", tareas)
         estado_seleccionado = st.selectbox("📊 Estado", estados)
     
+    # Subir múltiples fotos
+    st.markdown("📸 **Fotos del avance (opcional - puedes subir varias)**")
+    fotos_subidas = st.file_uploader("Seleccionar imágenes", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
+    
     submitted = st.form_submit_button("💾 Guardar Registro", use_container_width=True)
     
     if submitted:
         if not nombre_trabajador:
             st.error("❌ Por favor, ingrese el nombre del trabajador")
         else:
+            # Guardar fotos
+            lista_fotos = []
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            for i, foto in enumerate(fotos_subidas):
+                nombre_foto = f"obra_{timestamp}_{tarea_seleccionada[:20]}_{i}.jpg"
+                st.session_state.fotos_obra[nombre_foto] = foto.getvalue()
+                lista_fotos.append(nombre_foto)
+            
             nuevo_registro = pd.DataFrame([{
                 "Fecha": fecha.strftime("%Y-%m-%d"),
                 "Trabajador": nombre_trabajador,
                 "Tarea": tarea_seleccionada,
                 "Estado": estado_seleccionado,
-                "Hora_Registro": datetime.now().strftime("%H:%M:%S")
+                "Hora_Registro": datetime.now().strftime("%H:%M:%S"),
+                "Fotos": ", ".join(lista_fotos) if lista_fotos else ""
             }])
             st.session_state.df_registros = pd.concat([st.session_state.df_registros, nuevo_registro], ignore_index=True)
-            st.success("✅ Registro guardado correctamente")
+            st.success(f"✅ Registro guardado correctamente con {len(lista_fotos)} fotos")
             st.balloons()
 
 st.markdown("---")
@@ -95,7 +111,24 @@ st.markdown("---")
 st.subheader("📊 Registros Actuales")
 
 if not st.session_state.df_registros.empty:
-    st.dataframe(st.session_state.df_registros, use_container_width=True, height=300)
+    df_mostrar = st.session_state.df_registros.copy()
+    df_mostrar = df_mostrar.drop(columns=["Fotos"], errors='ignore')
+    st.dataframe(df_mostrar, use_container_width=True, height=300)
+    
+    # Ver fotos por registro
+    st.subheader("📸 Ver fotos guardadas")
+    registro_seleccionado = st.selectbox("Selecciona un registro para ver sus fotos", 
+                                          st.session_state.df_registros["Tarea"].tolist())
+    
+    if registro_seleccionado:
+        fila = st.session_state.df_registros[st.session_state.df_registros["Tarea"] == registro_seleccionado].iloc[0]
+        if fila["Fotos"] and fila["Fotos"] != "":
+            nombres_fotos = fila["Fotos"].split(", ")
+            for nombre_foto in nombres_fotos:
+                if nombre_foto in st.session_state.fotos_obra:
+                    st.image(st.session_state.fotos_obra[nombre_foto], caption=nombre_foto, width=200)
+        else:
+            st.info("Este registro no tiene fotos")
     
     st.subheader("📈 Resumen de tareas")
     resumen = st.session_state.df_registros.groupby("Estado").size().reset_index(name="Cantidad")
@@ -111,7 +144,8 @@ def generar_excel():
     
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        st.session_state.df_registros.to_excel(writer, sheet_name='Seguimiento_Obra', index=False)
+        df_export = st.session_state.df_registros.drop(columns=["Fotos"], errors='ignore')
+        df_export.to_excel(writer, sheet_name='Seguimiento_Obra', index=False)
         
         worksheet = writer.sheets['Seguimiento_Obra']
         for column in worksheet.columns:
@@ -131,7 +165,7 @@ def generar_excel():
 
 st.subheader("💾 Exportar Datos")
 
-col1, col2 = st.columns(2)
+col1, col2, col3 = st.columns(3)
 
 with col1:
     if not st.session_state.df_registros.empty:
@@ -141,13 +175,14 @@ with col1:
             href = f'<a href="data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,{b64}" download="seguimiento_obra_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx">📥 Descargar Excel</a>'
             st.markdown(href, unsafe_allow_html=True)
     else:
-        st.warning("⚠️ No hay datos para exportar")
+        st.warning("⚠️ No hay datos")
 
 with col2:
-    if st.button("🗑️ Limpiar todos los registros", use_container_width=True):
+    if st.button("🗑️ Limpiar registros", use_container_width=True):
         st.session_state.df_registros = pd.DataFrame(columns=[
-            "Fecha", "Trabajador", "Tarea", "Estado", "Hora_Registro"
+            "Fecha", "Trabajador", "Tarea", "Estado", "Hora_Registro", "Fotos"
         ])
+        st.session_state.fotos_obra = {}
         st.rerun()
 
 st.markdown("---")
@@ -162,7 +197,7 @@ if 'email_config' not in st.session_state:
     }
 
 with st.expander("⚙️ Configurar envío de correo"):
-    destinatario = st.text_input("📧 Correo del destinatario (empresa/profesora)", 
+    destinatario = st.text_input("📧 Correo del destinatario", 
                                  value=st.session_state.email_config['destinatario'])
     remitente = st.text_input("📤 Correo remitente (tu correo)", 
                               value=st.session_state.email_config['remitente'])
@@ -170,34 +205,29 @@ with st.expander("⚙️ Configurar envío de correo"):
                              type="password",
                              value=st.session_state.email_config.get('password', ''))
     
-    st.caption("""
-    **Nota:** Para Gmail, debes usar una [Contraseña de aplicación](https://myaccount.google.com/apppasswords).
-    No uses tu contraseña normal de Gmail por seguridad.
-    """)
+    st.caption("Para Gmail, usa una [Contraseña de aplicación](https://myaccount.google.com/apppasswords)")
     
     if st.button("💾 Guardar configuración"):
         st.session_state.email_config['destinatario'] = destinatario
         st.session_state.email_config['remitente'] = remitente
         st.session_state.email_config['password'] = password
-        st.success("Configuración guardada temporalmente")
+        st.success("Configuración guardada")
 
 def enviar_email(destinatario, remitente, password, archivo_excel):
     try:
         msg = MIMEMultipart()
         msg['From'] = remitente
         msg['To'] = destinatario
-        msg['Subject'] = f"Informe Seguimiento Obra - {datetime.now().strftime('%d/%m/%Y %H:%M')}"
+        msg['Subject'] = f"Informe Obra + Fotos - {datetime.now().strftime('%d/%m/%Y %H:%M')}"
         
         cuerpo = f"""
-        Informe de seguimiento de obra generado desde la app.
+        Informe de seguimiento de OBRA con fotos.
         
         Fecha: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}
         Total de registros: {len(st.session_state.df_registros)}
+        Total de fotos: {len(st.session_state.fotos_obra)}
         
-        Adjunto encontrará el archivo Excel con todos los registros.
-        
-        ---
-        Generado automáticamente por App Seguimiento de Obra
+        Adjuntos: Excel con datos y {len(st.session_state.fotos_obra)} fotos.
         """
         msg.attach(MIMEText(cuerpo, 'plain', 'utf-8'))
         
@@ -205,31 +235,36 @@ def enviar_email(destinatario, remitente, password, archivo_excel):
             part = MIMEBase('application', 'octet-stream')
             part.set_payload(archivo_excel.getvalue())
             encoders.encode_base64(part)
-            part.add_header(
-                'Content-Disposition',
-                f'attachment; filename=seguimiento_obra_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
-            )
+            part.add_header('Content-Disposition', 
+                           f'attachment; filename=obra_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx')
             msg.attach(part)
+        
+        for nombre_foto, datos_foto in st.session_state.fotos_obra.items():
+            part_img = MIMEBase('application', 'octet-stream')
+            part_img.set_payload(datos_foto)
+            encoders.encode_base64(part_img)
+            part_img.add_header('Content-Disposition', f'attachment; filename={nombre_foto}')
+            msg.attach(part_img)
         
         with smtplib.SMTP('smtp.gmail.com', 587) as server:
             server.starttls()
             server.login(remitente, password)
             server.send_message(msg)
         
-        return True, "Correo enviado correctamente"
+        return True, f"Correo enviado con {len(st.session_state.fotos_obra)} fotos"
     
     except Exception as e:
-        return False, f"Error al enviar: {str(e)}"
+        return False, f"Error: {str(e)}"
 
 col1, col2 = st.columns([2, 1])
 with col1:
-    if st.button("📧 Enviar Excel por correo", use_container_width=True, type="primary"):
+    if st.button("📧 Enviar Excel y fotos por correo", use_container_width=True, type="primary"):
         if st.session_state.df_registros.empty:
-            st.warning("⚠️ No hay registros para enviar")
+            st.warning("⚠️ No hay registros")
         elif not st.session_state.email_config.get('password'):
-            st.error("❌ Por favor, configure la contraseña en el panel de configuración")
+            st.error("❌ Configure la contraseña")
         else:
-            with st.spinner("Enviando correo..."):
+            with st.spinner("Enviando..."):
                 excel_data = generar_excel()
                 if excel_data:
                     success, message = enviar_email(
@@ -240,23 +275,15 @@ with col1:
                     )
                     if success:
                         st.success(f"✅ {message}")
-                        st.info(f"📧 Enviado a: {st.session_state.email_config['destinatario']}")
                     else:
                         st.error(f"❌ {message}")
                 else:
-                    st.error("No se pudo generar el archivo Excel")
+                    st.error("Error")
 
 with col2:
     if st.button("🔄 Actualizar", use_container_width=True):
         st.rerun()
 
 st.markdown("---")
-st.caption("""
-**ℹ️ Nota importante:** 
-- Los datos solo se guardan mientras la app esté activa (máximo ~2-3 horas en Streamlit Cloud)
-- Descarga el Excel periódicamente o envíalo por correo para conservar los registros
-- Para usar el envío de correo, activa el acceso a apps no seguras o genera una contraseña de aplicación en Gmail
-""")
-
-st.markdown("---")
-st.markdown("🏗️ **App Seguimiento de Obra** | Desarrollado para Fundación Masaveu")
+st.caption("Puedes subir varias fotos por registro. Se envían automáticamente por correo.")
+st.markdown("🏗️ **App Seguimiento de Obra con Fotos** | Fundación Masaveu")
