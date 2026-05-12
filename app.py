@@ -70,7 +70,8 @@ with st.form("form_registro"):
     
     with col1:
         nombre_trabajador = st.text_input("👷 Nombre del trabajador", placeholder="Ej: Pedro Martínez")
-        fecha = st.date_input("📅 Fecha", datetime.now())
+        # Selector de fecha con formato día/mes/año
+        fecha = st.date_input("📅 Fecha", datetime.now(), format="DD/MM/YYYY")
     
     with col2:
         tarea_seleccionada = st.selectbox("📌 Tarea", tareas)
@@ -92,7 +93,6 @@ with st.form("form_registro"):
                 st.session_state.fotos_obra[nombre_foto] = foto.getvalue()
                 lista_fotos.append(nombre_foto)
             
-            # Fecha en formato DÍA/MES/AÑO y hora con +2 (España)
             hora_espana = (datetime.now() + timedelta(hours=2)).strftime("%H:%M:%S")
             
             nuevo_registro = pd.DataFrame([{
@@ -117,18 +117,19 @@ if not st.session_state.df_registros.empty:
     st.dataframe(df_mostrar, use_container_width=True, height=300)
     
     st.subheader("📸 Ver fotos guardadas")
-    registro_seleccionado = st.selectbox("Selecciona un registro para ver sus fotos", 
-                                          st.session_state.df_registros["Tarea"].tolist())
-    
-    if registro_seleccionado:
-        fila = st.session_state.df_registros[st.session_state.df_registros["Tarea"] == registro_seleccionado].iloc[0]
-        if fila["Fotos"] and fila["Fotos"] != "":
-            nombres_fotos = fila["Fotos"].split(", ")
-            for nombre_foto in nombres_fotos:
-                if nombre_foto in st.session_state.fotos_obra:
-                    st.image(st.session_state.fotos_obra[nombre_foto], caption=nombre_foto, width=200)
-        else:
-            st.info("Este registro no tiene fotos")
+    if len(st.session_state.df_registros) > 0:
+        registro_seleccionado = st.selectbox("Selecciona un registro para ver sus fotos", 
+                                              st.session_state.df_registros["Tarea"].tolist())
+        
+        if registro_seleccionado:
+            fila = st.session_state.df_registros[st.session_state.df_registros["Tarea"] == registro_seleccionado].iloc[0]
+            if fila["Fotos"] and fila["Fotos"] != "":
+                nombres_fotos = fila["Fotos"].split(", ")
+                for nombre_foto in nombres_fotos:
+                    if nombre_foto in st.session_state.fotos_obra:
+                        st.image(st.session_state.fotos_obra[nombre_foto], caption=nombre_foto, width=200)
+            else:
+                st.info("Este registro no tiene fotos")
     
     st.subheader("📈 Resumen de tareas")
     resumen = st.session_state.df_registros.groupby("Estado").size().reset_index(name="Cantidad")
