@@ -70,7 +70,7 @@ with st.form("form_registro"):
     
     with col1:
         nombre_trabajador = st.text_input("👷 Nombre del trabajador", placeholder="Ej: Pedro Martínez")
-        # Selector de fecha con formato día/mes/año
+        # Fecha con valor por defecto = hoy, pero editable
         fecha = st.date_input("📅 Fecha", datetime.now(), format="DD/MM/YYYY")
     
     with col2:
@@ -286,5 +286,10 @@ with col2:
         st.rerun()
 
 st.markdown("---")
-st.caption("Puedes subir varias fotos por registro. Se envían automáticamente por correo.")
+st.caption("""
+**ℹ️ Nota importante:** 
+- Puedes subir varias fotos por registro
+- Las fotos se envían automáticamente por correo
+- La fecha aparece automáticamente con el día actual, pero puedes cambiarla si es necesario
+""")
 st.markdown("🏗️ **App Seguimiento de Obra con Fotos** | Fundación Masaveu")
